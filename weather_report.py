@@ -3,12 +3,11 @@ import os
 import requests
 import json
 from bs4 import BeautifulSoup
-
 # 从测试号信息获取
 appID = os.environ.get("APP_ID")
 appSecret = os.environ.get("APP_SECRET")
 # 收信人ID即 用户列表中的微信号
-openId = os.environ.get("OPEN_ID")
+openIds = os.environ.get("OPEN_ID", "").split(",")
 # 天气预报模板ID
 weather_template_id = os.environ.get("TEMPLATE_ID")
 
@@ -79,52 +78,45 @@ def get_daily_love():
 
 
 def send_weather(access_token, weather):
-    # touser 就是 openID
-    # template_id 就是模板ID
-    # url 就是点击模板跳转的url
-    # data就按这种格式写，time和text就是之前{{time.DATA}}中的那个time，value就是你要替换DATA的值
-
     import datetime
     today = datetime.date.today()
     today_str = today.strftime("%Y年%m月%d日")
 
-    body = {
-        "touser": openId.strip(),
-        "template_id": weather_template_id.strip(),
-        "url": "https://weixin.qq.com",
-        "data": {
-            "date": {
-                "value": today_str
-            },
-            "region": {
-                "value": weather[0]
-            },
-            "weather": {
-                "value": weather[2]
-            },
-            "temp": {
-                "value": weather[1]
-            },
-            "wind_dir": {
-                "value": weather[3]
-            },
-            "today_note": {
-                "value": get_daily_love()
-            }
-        }
+    # 准备消息内容
+    data = {
+        "date": {"value": today_str},
+        "region": {"value": weather[0]},
+        "weather": {"value": weather[2]},
+        "temp": {"value": weather[1]},
+        "wind_dir": {"value": weather[3]},
+        "today_note": {"value": get_daily_love()}
     }
-    url = 'https://api.weixin.qq.com/cgi-bin/message/template/send?access_token={}'.format(access_token)
-    print(requests.post(url, json.dumps(body)).text)
+
+    url = f'https://api.weixin.qq.com/cgi-bin/message/template/send?access_token={access_token}'
+
+    # 遍历列表进行推送
+    for open_id in openIds:
+        open_id = open_id.strip()
+        if not open_id:
+            continue
+
+        body = {
+            "touser": open_id,
+            "template_id": weather_template_id.strip(),
+            "url": "https://weixin.qq.com",
+            "data": data
+        }
+
+        response = requests.post(url, json.dumps(body)).text
+        print(f"发送给 {open_id} 的结果: {response}")
 
 
 
 def weather_report(this_city):
-    # 1.获取access_token
     access_token = get_access_token()
-    # 2. 获取天气
     weather = get_weather(this_city)
     print(f"天气信息： {weather}")
-    # 3. 发送消息
+    # 此时 send_weather 会自动遍历所有 IDs
     send_weather(access_token, weather)
 
 
